@@ -1,0 +1,157 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html"
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:p="http://primefaces.org/ui"
+                xmlns:f="http://java.sun.com/jsf/core" xmlns:o="http://omnifaces.org/ui"
+                xmlns:custom="http://java.sun.com/jsf/composite/components">
+
+    <o:importConstants type="com.remo.core.control.pid.model.PidMode"/>
+    <o:importConstants type="com.remo.core.control.pid.model.PidDirection"/>
+
+    <!--****************************************SELECT PID FORM****************************************-->
+
+    <h:form id="select-pid-form" prependId="false" class="form-horizontal top-offset" role="form">
+
+        <div class="form-group">
+            <div class="col-sm-6">
+                <custom:selectOnePid menuId="select-pid" pidEntry="#{guiBacking.pid}"
+                                     selectFromPids="#{guiBacking.pids}"/>
+                <h:message for="select-pid" styleClass="validation-input"/>
+            </div>
+
+            <div class="col-sm-6">
+                <p:commandButton value="Submit selected PID"
+                                 actionListener="#{guiBacking.submitSelectedPid()}"
+                                 update=":pid-selected-values :pid-form:overlay-panel-pid :pid-form:define-pid-overlay :select-pid-form"
+                                 styleClass="btn btn-block btn-primary btn-xs"/>
+            </div>
+        </div>
+
+    </h:form>
+
+    <!--****************************************EDIT PID FORM****************************************-->
+    <h:form id="pid-form" prependId="false" class="form-horizontal" role="form">
+
+        <div class="row">
+            <div class="col-sm-12">
+                <p:commandButton id="define-pid-overlay" value="Edit current PID" type="button"
+                                 styleClass="btn btn-warning btn-block" icon="ui-icon-plus"/>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-offset-2 col-sm-6">
+                <p:overlayPanel id="overlay-panel-pid" for="define-pid-overlay"
+                                hideEffect="fade"
+                                dynamic="true"
+                                dismissable="false" showCloseIcon="true" styleClass="alert alert-info overlay-common"
+                                widgetVar="overlay-panel-pid-widget">
+
+                    <h:panelGroup id="pid-panel-group-wrapper" class="row" layout="block">
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:inputText id="pp-gain" value="#{guiBacking.pid.pidParams.kp}"
+                                             styleClass="form-control" required="true"
+                                             requiredMessage="Gain required">
+                                    <f:validateDoubleRange minimum="0.0"/>
+                                </p:inputText>
+                                <p:watermark value="Gain" for="pp-gain"/>
+                                <h:message id="pp-gain-message" for="pp-gain" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:inputText id="pp-integr" value="#{guiBacking.pid.pidParams.ki}"
+                                             styleClass="form-control" required="true"
+                                             requiredMessage="Integral required">
+                                    <f:validateDoubleRange minimum="0.0"/>
+
+                                </p:inputText>
+                                <p:watermark value="Integral" for="pp-integr"/>
+                                <h:message id="pp-ki-message" for="pp-integr" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:inputText id="pp-kd" value="#{guiBacking.pid.pidParams.kd}"
+                                             styleClass="form-control" required="true"
+                                             requiredMessage="Derivative required">
+                                    <f:validateDoubleRange minimum="0.0"/>
+                                </p:inputText>
+                                <p:watermark value="Derivative" for="pp-kd"/>
+                                <h:message id="pp-kd-message" for="pp-kd" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <!--<h:outputLabel value="Mode:" for="pid-mode" styleClass="col-sm-2 control-label" />-->
+
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <h:selectOneMenu id="pid-mode" styleClass="form-control"
+                                                 value="#{guiBacking.pidController.pidMode}" required="true"
+                                                 requiredMessage="Please select a mode" layout="pageDirection"
+                                                 converter="omnifaces.GenericEnumConverter">
+                                    <f:selectItems value="#{PidMode}"/>
+                                </h:selectOneMenu>
+                                <h:message for="pid-mode" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <!--<h:outputLabel value="Dir:" for="pid-settings" styleClass="col-sm-2 control-label" />-->
+
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <h:selectOneMenu id="pid-direction" styleClass="form-control"
+                                                 value="#{guiBacking.pidController.pid.pidDirection}" required="true"
+                                                 requiredMessage="Please select a direction" layout="pageDirection"
+                                                 converter="omnifaces.GenericEnumConverter">
+                                    <f:selectItems value="#{PidDirection}"/>
+                                </h:selectOneMenu>
+                                <h:message for="pid-direction" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <h:outputText id="pid-output-range"
+                                              value="Pid output: #{guiBacking.pid.pidOutputRange.minRange} to #{guiBacking.pid.pidOutputRange.maxRange}"/>
+                                <p:slider for="txt6,txt7" display="pid-output-range" range="true"
+                                          displayTemplate="{min} to {max}" minValue="0" maxValue="255"/>
+                                <h:inputHidden id="txt6" value="#{guiBacking.pid.pidOutputRange.minRange}"/>
+                                <h:inputHidden id="txt7" value="#{guiBacking.pid.pidOutputRange.maxRange}"/>
+                                <h:message for="pid-output-range" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <h:outputText id="sample-time-output"
+                                              value="Sample time: #{guiBacking.pidSampleSeconds}"/>
+                                <h:inputHidden id="sample-time" value="#{guiBacking.pidSampleSeconds}"/>
+                                <p:slider for="sample-time" display="sample-time-output"
+                                          displayTemplate="Sample sec: {value}"
+                                          step="1" minValue="1" maxValue="10"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:commandButton value="Set chart samples"
+                                                 actionListener="#{guiBacking.submitEditedPidSettings()}"
+                                                 update=":pid-form:pid-panel-group-wrapper"
+                                                 oncomplete="slideToSuccessfulOrErrorMessage(xhr, status, args, '.validation-input', '.page-header.header-div','overlay-panel-pid-widget')"
+                                                 styleClass="btn btn-block btn-primary btn-xs"
+                                                 process="pid-panel-group-wrapper"/>
+                            </div>
+                        </div>
+
+                    </h:panelGroup>
+
+                </p:overlayPanel>
+            </div>
+        </div>
+
+    </h:form>
+
+</ui:composition>

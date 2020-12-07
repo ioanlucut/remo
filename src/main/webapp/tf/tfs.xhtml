@@ -1,0 +1,92 @@
+<ui:composition template="/WEB-INF/templates/page_template_default_impl.xhtml" xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:f="http://xmlns.jcp.org/jsf/core" xmlns:h="http://xmlns.jcp.org/jsf/html"
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:p="http://primefaces.org/ui"
+                xmlns:o="http://omnifaces.org/ui" xmlns:custom="http://java.sun.com/jsf/composite/components">
+
+    <f:metadata>
+        <f:viewAction action="#{transferFunctionBacking.initOrReload}" onPostback="false"/>
+    </f:metadata>
+
+    <ui:define name="RemoComponent">
+
+        <o:importConstants type="com.remo.core.control.pid.model.PidMode"/>
+        <o:importConstants type="com.remo.core.control.pid.model.PidDirection"/>
+
+        <div class="col-sm-4">
+            <div class="panel panel-warning">
+                <div class="panel-heading">New TF definition</div>
+                <div class="panel-body">
+                    <!--****************************************Transfer function form****************************************-->
+                    <h:form id="transfer-function-form" prependId="false" class="form-horizontal" role="form">
+
+                        <h:panelGroup id="transfer-function-panel-group-wrapper" class="row" layout="block">
+
+                            <f:facet name="header">Transfer function definition</f:facet>
+
+                            <div class="form-group">
+                                <div class="col-sm-offset-2 col-sm-8">
+                                    <p:inputText id="tf-gain" value="#{transferFunctionBacking.transferFunction.gainK}"
+                                                 styleClass="form-control" required="true"
+                                                 requiredMessage="Gain required">
+                                    </p:inputText>
+                                    <p:watermark value="Gain" for="tf-gain"/>
+                                    <h:message for="tf-gain" styleClass="validation-input"/>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="col-sm-offset-2 col-sm-8">
+                                    <p:inputText id="tf-time"
+                                                 value="#{transferFunctionBacking.transferFunction.timeConstantT}"
+                                                 styleClass="form-control" required="true"
+                                                 requiredMessage="Time constant required">
+                                    </p:inputText>
+                                    <p:watermark value="Time" for="tf-time"/>
+                                    <h:message for="tf-time" styleClass="validation-input"/>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="col-sm-offset-2 col-sm-8">
+                                    <p:inputText id="tf-delay"
+                                                 value="#{transferFunctionBacking.transferFunction.delayL}"
+                                                 styleClass="form-control" required="true"
+                                                 requiredMessage="Delay required">
+                                    </p:inputText>
+                                    <p:watermark value="Delay" for="tf-delay"/>
+                                    <h:message for="tf-delay" styleClass="validation-input"/>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <div class="col-sm-offset-2 col-sm-8 top-offset">
+                                    <p:commandButton value="Add"
+                                                     actionListener="#{transferFunctionBacking.submitForm()}"
+                                                     update=":transfer-function-form:transfer-function-panel-group-wrapper :existing-tfs-wrapper"
+                                                     styleClass="btn btn-block btn-primary btn-xs"/>
+                                </div>
+                            </div>
+
+                        </h:panelGroup>
+
+                    </h:form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-8">
+            <h:panelGroup id="existing-tfs-wrapper" class="panel panel-warning" layout="block">
+                <div class="panel-heading">Existing PIDS</div>
+                <div class="panel-body">
+                    <div class="panel panel-default">
+                        <div class="panel-body">
+                            <custom:tfsList tfs="#{transferFunctionBacking.transferFunctions}"></custom:tfsList>
+                        </div>
+                    </div>
+                </div>
+
+            </h:panelGroup>
+        </div>
+    </ui:define>
+
+</ui:composition>

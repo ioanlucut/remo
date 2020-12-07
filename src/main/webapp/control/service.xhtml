@@ -1,0 +1,216 @@
+<ui:composition template="/WEB-INF/templates/page_template_default_impl.xhtml" xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:f="http://xmlns.jcp.org/jsf/core" xmlns:h="http://xmlns.jcp.org/jsf/html"
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+
+
+    <ui:define name="RemoComponent">
+
+        <f:metadata>
+            <f:viewAction action="#{guiBacking.initOrReload}" onPostback="false"/>
+        </f:metadata>
+
+        <div class="row top-offset">
+
+            <!--****************************************Transfer function button + definition************************************-->
+            <div class="col-sm-3">
+
+                <h:panelGroup id="tf-selected-values" layout="block">
+
+                    <div class="panel panel-warning">
+                        <div class="panel-heading">Transfer function</div>
+                        <div class="panel-body">
+
+                            <div class="panel panel-default">
+                                <div class="panel-body">
+
+                                    <div class="row top-offset">
+                                        <div class="col-sm-offset-3 col-xs-6">
+                                            <div class="p btn btn-block btn-info">
+                                                <strong class="text-left">Gain</strong>
+                                                <span class="pull-right">
+                                        <strong>
+                                            <h:outputText value="#{guiBacking.transferFunction.gainK}">
+                                                <f:convertNumber pattern="###,##"/>
+                                            </h:outputText>
+                                        </strong>
+                                    </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row top-offset">
+                                        <div class="col-sm-offset-3 col-xs-6">
+                                            <div class="i btn btn-block btn-warning">
+                                                <strong class="text-left">Time</strong>
+                                                <span class="pull-right">
+                                <strong>
+                                    <h:outputText value="#{guiBacking.transferFunction.timeConstantT}">
+                                        <f:convertNumber pattern="###,##"/>
+                                    </h:outputText>
+                                </strong>
+                            </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row top-offset">
+                                        <div class="col-sm-offset-3 col-xs-6">
+                                            <div class="d btn btn-block btn-success">
+                                                <strong class="text-left">Delay</strong>
+                                                <span class="pull-right">
+                                <strong>
+                                    <h:outputText value="#{guiBacking.transferFunction.delayL}">
+                                        <f:convertNumber pattern="###,##"/>
+                                    </h:outputText>
+                                </strong>
+                            </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="panel panel-default">
+                                <div class="panel-body">
+                                    <ui:include src="/WEB-INF/components/control/transfer_function.xhtml"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </h:panelGroup>
+
+            </div>
+
+            <!--****************************************PID form************************************-->
+            <div class="col-sm-3">
+
+                <h:panelGroup id="pid-selected-values" layout="block">
+
+                    <div class="panel panel-warning">
+                        <div class="panel-heading">Pid settings</div>
+                        <div class="panel-body">
+
+                            <div class="row">
+                                <div class="col-xs-12">
+
+                                    <div class="panel panel-default">
+                                        <div class="panel-body">
+
+
+                                            <div class="row top-offset">
+                                                <div class="col-sm-offset-3 col-xs-6">
+                                                    <div class="p btn btn-block btn-info">
+                                                        <strong class="text-left">Kp</strong>
+                                                        <span class="pull-right">
+                                                <strong>
+                                                    #{guiBacking.pid.pidParams.kp}
+                                                </strong>
+                                            </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row top-offset">
+                                                <div class="col-sm-offset-3 col-xs-6">
+                                                    <div class="i btn btn-block btn-warning">
+                                                        <strong class="text-left">Ki</strong>
+                                                        <span class="pull-right">
+                                            <strong>
+                                                #{guiBacking.pid.pidParams.ki}
+                                            </strong>
+                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row top-offset">
+                                                <div class="col-sm-offset-3 col-xs-6">
+                                                    <div class="d btn btn-block btn-success">
+                                                        <strong class="text-left">Kd</strong>
+                                                        <span class="pull-right">
+                                            <strong>
+                                                #{guiBacking.pid.pidParams.kd}
+                                            </strong>
+                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row top-offset text-center">
+                                                <div class="col-xs-6">
+                                                    <strong>Direction:</strong>
+                                                    #{guiBacking.pidController.pid.pidDirection}
+                                                </div>
+                                                <div class="col-xs-6">
+                                                    <strong>Mode:</strong> #{guiBacking.pidController.pidMode}
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-xs-12">
+
+                                    <div class="panel panel-default">
+                                        <div class="panel-body">
+
+                                            <ui:include src="/WEB-INF/components/control/pid_settings.xhtml"/>
+
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </h:panelGroup>
+
+            </div>
+
+            <!--****************************************Chart series options form************************************-->
+            <div class="col-sm-3">
+                <div class="panel panel-warning">
+                    <div class="panel-heading">Chart Settings</div>
+                    <div class="panel-body">
+
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <ui:include src="/WEB-INF/components/control/chart_settings.xhtml"/>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!--****************************************Control options************************************-->
+            <div class="col-sm-3">
+                <div class="panel panel-warning">
+                    <div class="panel-heading">Control settings</div>
+                    <div class="panel-body">
+                        <ui:include src="/WEB-INF/components/control/remote_service.xhtml"/>
+                        <ui:include src="/WEB-INF/components/control/control_settings.xhtml"/>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!--****************************************Chart************************************-->
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <ui:include src="/WEB-INF/components/control/chart.xhtml"/>
+            </div>
+        </div>
+
+    </ui:define>
+
+</ui:composition>

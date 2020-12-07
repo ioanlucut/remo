@@ -1,0 +1,68 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                xmlns:p="http://primefaces.org/ui" xmlns:h="http://java.sun.com/jsf/html"
+                template="/WEB-INF/templates/main_page_template.xhtml">
+
+    <!-- This template is to be used by all Remo pages-->
+    <ui:define name="content">
+
+        <!-- Navigation part -->
+        <nav class="navbar navbar-default navbar-fixed-top navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <ul class="nav navbar-nav">
+                    <li>
+                        <h:link value="Home" outcome="/control/service" styleClass="">
+                            <i class="fa fa-external-link-square"></i>
+                        </h:link>
+                    </li>
+
+                    <li>
+                        <h:link value="Pids" outcome="/pid/pids" styleClass="">
+                            <i class="fa fa-external-link-square"></i>
+                        </h:link>
+                    </li>
+
+                    <li>
+                        <h:link value="Transfer functions" outcome="/tf/tfs" styleClass="">
+                            <i class="fa fa-external-link-square"></i>
+                        </h:link>
+                    </li>
+
+                </ul>
+
+                <!-- Logout form -->
+                <h:form id="adminLogoutForm" prependId="false" class="form-horizontal navbar-form  pull-right"
+                        role="form">
+                    <div class="form-group">
+                        <p:commandButton id="adminLogoutButton" value="Logout" styleClass="btn btn-danger btn-xs"
+                                         actionListener="#{logoutBacking.submit}"
+                                         update=":global-messages adminLogoutForm"/>
+                    </div>
+                </h:form>
+
+            </div>
+        </nav>
+
+        <!-- Messages -->
+        <div class="messages-wrapper">
+            <div class="row">
+                <div class="col-xs-12">
+                    <p:messages id="global-messages" autoUpdate="true" closable="true" globalOnly="true"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL -->
+        <div class="row">
+
+            <div class="col-xs-12 top-offset main">
+
+                <!-- CONTENT - to be defined in subpages  -->
+                <ui:insert name="RemoComponent"/>
+
+            </div>
+        </div>
+
+    </ui:define>
+
+</ui:composition>

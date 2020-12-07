@@ -1,0 +1,98 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html"
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:p="http://primefaces.org/ui"
+                xmlns:f="http://java.sun.com/jsf/core" xmlns:custom="http://java.sun.com/jsf/composite/components">
+
+    <!--****************************************SELECT PID FORM****************************************-->
+    <h:form id="select-tf-form" prependId="false" class="form-horizontal top-offset" role="form">
+
+        <div class="form-group">
+            <div class="col-sm-6">
+                <custom:selectOneTf menuId="select-tf" tfEntry="#{guiBacking.transferFunction}"
+                                    selectFromTfs="#{guiBacking.transferFunctions}"/>
+                <h:message for="select-tf" styleClass="validation-input"/>
+            </div>
+
+            <div class="col-sm-6">
+                <p:commandButton value="Submit selected TF"
+                                 actionListener="#{guiBacking.submitSelectedTransferFunction()}"
+                                 update=":transfer-function-form:overlay-panel-transfer-function :transfer-function-form:define-transfer-function-overlay :select-tf-form :tf-selected-values"
+                                 styleClass="btn btn-block btn-primary btn-xs"/>
+            </div>
+        </div>
+
+    </h:form>
+
+    <!--****************************************Transfer function form****************************************-->
+    <h:form id="transfer-function-form" prependId="false" class="form-horizontal" role="form">
+
+        <div class="row">
+            <div class="col-sm-12">
+                <p:commandButton id="define-transfer-function-overlay" value="Edit current Transfer Function"
+                                 type="button"
+                                 styleClass="btn btn-warning btn-block" icon="ui-icon-plus"/>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-offset-2 col-sm-6">
+                <p:overlayPanel id="overlay-panel-transfer-function" for="define-transfer-function-overlay"
+                                hideEffect="fade"
+                                dynamic="true"
+                                dismissable="false" showCloseIcon="true" styleClass="alert alert-info overlay-common"
+                                widgetVar="overlay-panel-tf-widget">
+                    <h:panelGroup id="transfer-function-panel-group-wrapper" class="row" layout="block">
+
+                        <f:facet name="header">Transfer function definition</f:facet>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:inputText id="tf-gain" value="#{guiBacking.transferFunction.gainK}"
+                                             styleClass="form-control" required="true"
+                                             requiredMessage="Gain required">
+                                </p:inputText>
+                                <p:watermark value="Gain" for="tf-gain"/>
+                                <h:message for="tf-gain" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:inputText id="tf-time" value="#{guiBacking.transferFunction.timeConstantT}"
+                                             styleClass="form-control" required="true"
+                                             requiredMessage="Time constant required">
+                                </p:inputText>
+                                <p:watermark value="Time" for="tf-time"/>
+                                <h:message for="tf-time" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8">
+                                <p:inputText id="tf-delay" value="#{guiBacking.transferFunction.delayL}"
+                                             styleClass="form-control" required="true"
+                                             requiredMessage="Delay required">
+                                </p:inputText>
+                                <p:watermark value="Delay" for="tf-delay"/>
+                                <h:message for="tf-delay" styleClass="validation-input"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-8 top-offset">
+                                <p:commandButton value="Add"
+                                                 actionListener="#{guiBacking.submitEditedTransferFunction()}"
+                                                 update=":transfer-function-form:transfer-function-panel-group-wrapper"
+                                                 oncomplete="slideToSuccessfulOrErrorMessage(xhr, status, args, '.validation-input', '.page-header.header-div', 'overlay-panel-tf-widget')"
+                                                 styleClass="btn btn-block btn-primary btn-xs"
+                                                 process="transfer-function-panel-group-wrapper"/>
+                            </div>
+                        </div>
+
+                    </h:panelGroup>
+                </p:overlayPanel>
+            </div>
+        </div>
+
+    </h:form>
+
+</ui:composition>

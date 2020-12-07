@@ -1,0 +1,67 @@
+<ui:component xmlns="http://www.w3.org/1999/xhtml" xmlns:f="http://java.sun.com/jsf/core"
+              xmlns:h="http://java.sun.com/jsf/html" xmlns:cc="http://java.sun.com/jsf/composite"
+              xmlns:ui="http://java.sun.com/jsf/facelets" xmlns:c="http://java.sun.com/jsp/jstl/core"
+              xmlns:o="http://omnifaces.org/ui">
+
+    <cc:interface>
+        <cc:attribute name="pids" type="java.util.List" required="true"/>
+        <cc:attribute name="performButtonIcon" type="java.lang.String" default="ui-icon-trash"/>
+        <cc:attribute name="performButtonTooltipText" type="java.lang.String"/>
+    </cc:interface>
+
+    <cc:implementation>
+
+        <div class="col-sm-12 text-left">
+
+            <o:form id="pids-list" prependId="false" class="form-horizontal" role="form"
+                    includeViewParams="true">
+                <h:panelGroup layout="block" styleClass="table-responsive">
+                    <table class="table table-condensed">
+                        <tr>
+                            <th>Id</th>
+                            <th>Kp</th>
+                            <th>Kd</th>
+                            <th>Ki</th>
+                            <th>Output</th>
+                            <th>Mode</th>
+                            <th>Direction</th>
+                            <th>Added</th>
+                        </tr>
+                        <c:forEach var="pid" items="#{cc.attrs.pids}">
+
+                            <!-- Header -->
+                            <tr>
+                                <td>#{pid.id}</td>
+                                <td>
+                                    #{pid.pidParams.kp}
+                                </td>
+                                <td>
+                                    #{pid.pidParams.kd}
+                                </td>
+                                <td>
+                                    #{pid.pidParams.ki}
+                                </td>
+                                <td>
+                                    #{pid.pidOutputRange.minRange} - #{pid.pidOutputRange.maxRange}
+                                </td>
+                                <td>#{pid.pidMode}</td>
+                                <td>#{pid.pidDirection}</td>
+                                <td>
+                                    <span class="text-muted bid-batch-time">Added at </span>
+                                    <h:outputText value="#{pid.pidTimestamp}"
+                                                  styleClass="text-muted bid-batch-time">
+                                        <f:convertDateTime pattern="dd-MMM-yyyy HH:mm:ss"/>
+                                    </h:outputText>
+                                </td>
+                            </tr>
+                        </c:forEach>
+                    </table>
+
+                </h:panelGroup>
+            </o:form>
+
+        </div>
+
+    </cc:implementation>
+
+</ui:component>

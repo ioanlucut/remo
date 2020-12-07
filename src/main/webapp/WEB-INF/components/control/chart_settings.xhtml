@@ -1,0 +1,114 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml" xmlns:h="http://xmlns.jcp.org/jsf/html"
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:p="http://primefaces.org/ui"
+                xmlns:f="http://java.sun.com/jsf/core">
+
+    <!--****************************************Chart series options form************************************-->
+
+    <h:form id="chart-op-form" prependId="false" class="form-horizontal" role="form">
+
+        <h:panelGroup id="chart-op-panel-group-wrapper" layout="block">
+
+            <div class="form-group">
+                <div class="col-xs-6">
+                    <p:inputText id="series-samples-to-show"
+                                 value="#{chartsBacking.seriesOptions.samplesToShow}"
+                                 styleClass="form-control" required="true"
+                                 requiredMessage="Please provide a proper number">
+                        <f:validateLongRange minimum="10" maximum="100"/>
+                    </p:inputText>
+                    <p:watermark value="Samples: " for="series-samples-to-show"/>
+                    <h:message id="series-samples-to-show-message" for="series-samples-to-show"
+                               styleClass="validation-input"/>
+                </div>
+                <div class="col-xs-6">
+                    <p:commandButton value="Update samples"
+                                     actionListener="#{chartsBacking.submitSeriesOption()}"
+                                     update=":chart-op-form:chart-op-panel-group-wrapper"
+                                     oncomplete="slideToSuccessfulOrErrorMessage(xhr, status, args, '.validation-input', '.page-header.header-div', 'overlay-panel-chart-op-widget')"
+                                     styleClass="btn btn-block btn-primary btn-xs"
+                                     process="chart-op-panel-group-wrapper"/>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="col-xs-6">
+                    <!--CLEAR BUTTON-->
+                    <p:commandButton id="clear-history" actionListener="#{chartsBacking.clearCharts()}"
+                                     icon="ui-icon-trash" styleClass="btn btn-block btn-danger btn-xs"
+                                     update=":control-options-display"
+                                     process="clear-history" value="Reset chart">
+                    </p:commandButton>
+                </div>
+                <div class="col-xs-6">
+                    <!--START/STOP Pooling-->
+                    <p:commandButton id="start-polling" actionListener="#{guiBacking.stopPolling()}"
+                                     value="Stop Polling"
+                                     icon="ui-icon-pause" styleClass="btn btn-block btn-danger btn-xs"
+                                     update=":chart-form :chart-op-form:chart-op-panel-group-wrapper"
+                                     rendered="#{guiBacking.pollingStarted}"
+                                     process="start-polling">
+                    </p:commandButton>
+                    <p:commandButton id="stop-polling" actionListener="#{guiBacking.startPolling()}"
+                                     value="Start Polling"
+                                     icon="ui-icon-play" styleClass="btn btn-block btn-success btn-xs"
+                                     update=":chart-form :chart-op-form:chart-op-panel-group-wrapper"
+                                     rendered="#{not guiBacking.pollingStarted}"
+                                     process="stop-polling">
+                    </p:commandButton>
+                </div>
+
+            </div>
+
+        </h:panelGroup>
+
+    </h:form>
+
+    <h:panelGroup id="chart-op-panel-settings" layout="block">
+
+        <div class="row">
+            <div class="col-xs-12">
+
+                <div class="row top-offset">
+                    <div class="col-sm-offset-3 col-xs-6">
+                        <div class="pv btn btn-block btn-info">
+                            <strong class="text-left">PV</strong>
+                            <span class="pull-right">
+                                    <h:outputText value="#{guiBacking.pidController.input}">
+                                        <f:convertNumber pattern="###,##"/>
+                                    </h:outputText>
+                                </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row top-offset">
+                    <div class="col-sm-offset-3 col-xs-6">
+                        <div class="sp btn btn-block btn-warning">
+                            <strong class="text-left">SP</strong>
+                            <span class="pull-right">
+                                    <h:outputText value="#{guiBacking.pidController.setPoint}">
+                                        <f:convertNumber pattern="###,##"/>
+                                    </h:outputText>
+                                </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row top-offset">
+                    <div class="col-sm-offset-3 col-xs-6">
+                        <div class="cmd btn btn-block btn-success">
+                            <strong class="text-left">Cmd</strong>
+                            <span class="pull-right">
+                                    <h:outputText value="#{guiBacking.pidController.output}">
+                                        <f:convertNumber pattern="###,##"/>
+                                    </h:outputText>
+                                </span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </h:panelGroup>
+
+</ui:composition>
