@@ -6,7 +6,7 @@ package org.ilu.remo.control;
  * <ul>
  *   <li>Gains are per second and every step receives the elapsed time, so tuning does not depend on the sample rate.</li>
  *   <li>The derivative acts on the measurement, not the error, so a setpoint change does not cause a derivative kick.</li>
- *   <li>The integral term is clamped to the output limits (anti-windup).</li>
+ *   <li>Conditional integration prevents the integral from driving a saturated output farther out (anti-windup).</li>
  *   <li>{@link #initialize} gives a bumpless transfer when taking over from manual mode or after a fault.</li>
  * </ul>
  *
@@ -59,6 +59,7 @@ public final class PidController {
     private double integral;
     private double lastMeasurement;
     private double output;
+    private boolean transferPending;
 
     public PidController(Gains gains, Direction direction, OutputLimits limits) {
         this.gains = gains;
@@ -73,25 +74,46 @@ public final class PidController {
      * @param dtSeconds time elapsed since the previous update or {@link #initialize}
      */
     public double update(double setpoint, double measurement, double dtSeconds) {
-        if (!(dtSeconds > 0)) {
-            throw new IllegalArgumentException("dtSeconds must be positive, was " + dtSeconds);
+        if (!Double.isFinite(dtSeconds) || dtSeconds <= 0) {
+            throw new IllegalArgumentException("dtSeconds must be positive and finite, was " + dtSeconds);
         }
 
         double error = direction.sign * (setpoint - measurement);
-        integral = limits.clamp(integral + gains.ki() * error * dtSeconds);
+        double proportional = gains.kp() * error;
         double derivative = -direction.sign * gains.kd() * (measurement - lastMeasurement) / dtSeconds;
+        if (transferPending) {
+            // Balance P and D so taking control starts from the output already in effect.
+            integral = output - proportional - derivative;
+            transferPending = false;
+        }
 
-        output = limits.clamp(gains.kp() * error + integral + derivative);
+        double candidateIntegral = integral + gains.ki() * error * dtSeconds;
+        double candidateOutput = proportional + candidateIntegral + derivative;
+        boolean pushesHighSaturation = candidateOutput > limits.max() && error > 0;
+        boolean pushesLowSaturation = candidateOutput < limits.min() && error < 0;
+        if (!pushesHighSaturation && !pushesLowSaturation) {
+            integral = candidateIntegral;
+        }
+
+        output = limits.clamp(proportional + integral + derivative);
         lastMeasurement = measurement;
 
         return output;
     }
 
-    /** Continues smoothly from {@code currentOutput}: the next update starts from there instead of jumping. */
+    /** Clears accumulated control state while priming the derivative from {@code measurement}. */
+    public void reset(double measurement) {
+        integral = 0;
+        lastMeasurement = measurement;
+        output = limits.min();
+        transferPending = false;
+    }
+
+    /** Continues smoothly from {@code currentOutput}: the next update compensates its P and D contributions. */
     public void initialize(double currentOutput, double measurement) {
         output = limits.clamp(currentOutput);
-        integral = output;
         lastMeasurement = measurement;
+        transferPending = true;
     }
 
     public Gains gains() {

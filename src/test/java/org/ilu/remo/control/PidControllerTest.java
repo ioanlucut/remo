@@ -16,7 +16,7 @@ class PidControllerTest {
     @Test
     void proportionalOutputIsGainTimesError() {
         PidController pid = new PidController(new Gains(2, 0, 0), Direction.DIRECT, LIMITS);
-        pid.initialize(0, 40);
+        pid.reset(40);
 
         assertThat(pid.update(50, 40, 0.1)).isEqualTo(20);
     }
@@ -25,8 +25,8 @@ class PidControllerTest {
     void integralDependsOnElapsedTimeNotOnSampleRate() {
         PidController fast = new PidController(new Gains(0, 1, 0), Direction.DIRECT, LIMITS);
         PidController slow = new PidController(new Gains(0, 1, 0), Direction.DIRECT, LIMITS);
-        fast.initialize(0, 0);
-        slow.initialize(0, 0);
+        fast.reset(0);
+        slow.reset(0);
 
         double fastOutput = 0;
         for (int i = 0; i < 10; i++) {
@@ -41,7 +41,7 @@ class PidControllerTest {
     @Test
     void outputIsClampedToLimits() {
         PidController pid = new PidController(new Gains(100, 0, 0), Direction.DIRECT, LIMITS);
-        pid.initialize(0, 0);
+        pid.reset(0);
 
         assertThat(pid.update(50, 0, 0.1)).isEqualTo(100);
         assertThat(pid.update(-50, 0, 0.1)).isEqualTo(0);
@@ -50,7 +50,7 @@ class PidControllerTest {
     @Test
     void integralDoesNotWindUpWhileSaturated() {
         PidController pid = new PidController(new Gains(1, 5, 0), Direction.DIRECT, LIMITS);
-        pid.initialize(0, 0);
+        pid.reset(0);
         for (int i = 0; i < 1_000; i++) {
             pid.update(1_000, 0, 0.1);
         }
@@ -64,7 +64,7 @@ class PidControllerTest {
     @Test
     void reverseDirectionRaisesOutputWhenProcessIsAboveSetpoint() {
         PidController pid = new PidController(new Gains(2, 0, 0), Direction.REVERSE, LIMITS);
-        pid.initialize(0, 60);
+        pid.reset(60);
 
         assertThat(pid.update(50, 60, 0.1)).isEqualTo(20);
     }
@@ -72,15 +72,15 @@ class PidControllerTest {
     @Test
     void setpointStepCausesNoDerivativeKick() {
         PidController pid = new PidController(new Gains(0, 0, 10), Direction.DIRECT, LIMITS);
-        pid.initialize(50, 40);
+        pid.reset(40);
 
-        assertThat(pid.update(90, 40, 0.1)).isEqualTo(50);
+        assertThat(pid.update(90, 40, 0.1)).isZero();
     }
 
     @Test
     void derivativeOpposesAMovingMeasurement() {
         PidController pid = new PidController(new Gains(0, 0, 1), Direction.DIRECT, new OutputLimits(-100, 100));
-        pid.initialize(0, 40);
+        pid.reset(40);
 
         assertThat(pid.update(50, 41, 0.1)).isCloseTo(-10, within(1e-9));
     }
@@ -91,6 +91,14 @@ class PidControllerTest {
         pid.initialize(42, 50);
 
         assertThat(pid.update(50, 50, 0.1)).isEqualTo(42);
+    }
+
+    @Test
+    void initializeDoesNotReapplyTheProportionalTermWhenThereIsAnError() {
+        PidController pid = new PidController(new Gains(2.5, 0.3, 0), Direction.DIRECT, LIMITS);
+        pid.initialize(40, 0);
+
+        assertThat(pid.update(60, 0, 0.1)).isCloseTo(41.8, within(1e-9));
     }
 
     @Test

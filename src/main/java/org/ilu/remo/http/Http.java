@@ -55,17 +55,22 @@ public final class Http {
         }
     }
 
-    /** Starts a server on {@code port} (0 picks a free port) that runs every request on a virtual thread. */
+    /** Starts a loopback-only server on {@code port} (0 picks a free port). */
     public static HttpServer start(int port, Map<String, HttpHandler> routes) {
+        return start("127.0.0.1", port, routes);
+    }
+
+    /** Starts a server on {@code bindHost} and {@code port} that runs every request on a virtual thread. */
+    public static HttpServer start(String bindHost, int port, Map<String, HttpHandler> routes) {
         try {
-            HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+            HttpServer server = HttpServer.create(new InetSocketAddress(bindHost, port), 0);
             routes.forEach(server::createContext);
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
             server.start();
 
             return server;
         } catch (IOException ex) {
-            throw new UncheckedIOException("Could not start HTTP server on port " + port, ex);
+            throw new UncheckedIOException("Could not start HTTP server on " + bindHost + ":" + port, ex);
         }
     }
 

@@ -61,7 +61,7 @@ The 2014 version had the first of these bugs. The rebuild handles all four.
 
 ## How Remo handles each failure
 
-- **Every remote call has a deadline.** Each call must answer within 40% of the sample period (40 ms at the default 100 ms). A slow answer counts as a lost one, so a sample never overruns.
+- **Every remote call has a deadline.** Each call must answer within 40% of the sample period (40 ms at the default 100 ms). A slow answer counts as a lost one, so a sample never overruns. Actuator commands carry that expiry and an increasing sequence, so a timed-out or out-of-order command cannot take effect later. If only its acknowledgement is lost, the controller reconciles the sequence before sending another command.
 - **A missing reading is never treated as data.** The PID only sees fresh readings. The sensor reports the age of its value, and a stale value counts as missing.
 - **A sensor loss is handled in stages.**
   1. `HOLDING`: keep the last output that was applied.
@@ -72,7 +72,7 @@ The 2014 version had the first of these bugs. The rebuild handles all four.
 - **Tuning doesn't depend on the sample rate.**
   - Gains are per second, and each step uses the time that actually elapsed.
   - The derivative acts on the measurement, so a setpoint change causes no derivative kick.
-  - The integral is clamped to the output range (anti-windup).
+  - Conditional integration stops the integral from driving a saturated output farther past its limit (anti-windup).
 - **The simulated process behaves like a physical one.**
   - First order with dead time, discretised exactly.
   - It runs on its own clock in the sensor service.
@@ -113,8 +113,8 @@ sequenceDiagram
     C->>S: GET /reading (timeout 40 ms)
     S-->>C: { value, ageMillis }
     Note over C: stale or missing? HOLDING / FAIL_SAFE<br/>otherwise u = PID(setpoint, value, Δt)
-    C->>A: POST /command { value: u } (timeout 40 ms)
-    A-->>C: { applied, watchdogTripped }
+    C->>A: POST /command { value: u, sequence, expiry } (timeout 40 ms)
+    A-->>C: { applied, watchdogTripped, lastSequence }
     Note over C: no answer? freeze the integrator,<br/>retry the last applied output
     loop every 50 ms, on the physical side
         S->>A: GET /state (the valve position drives the process)
@@ -141,11 +141,13 @@ stateDiagram-v2
 
 $$e_k = \sigma (SP - PV_k)$$
 
-$$I_k = \mathrm{clamp}\big(I_{k-1} + K_i e_k \Delta t_k\big)$$
+$$I_k^* = I_{k-1} + K_i e_k \Delta t_k$$
 
 $$u_k = \mathrm{clamp}\Big(K_p e_k + I_k - \sigma K_d \frac{PV_k - PV_{k-1}}{\Delta t_k}\Big)$$
 
-- A bumpless transfer sets $I := u$ and $PV_{k-1} := PV_k$, so the next step continues from the current output.
+$I_k = I_{k-1}$ when $I_k^*$ would drive an already saturated output farther past its limit; otherwise $I_k = I_k^*$. This is conditional-integration anti-windup.
+
+- A bumpless transfer balances the terms as $I := u - P - D$ and primes the previous measurement, so proportional and derivative action cannot be reapplied on top of the output already in effect.
 - The defaults ($K_p = 2.5$, $K_i = 0.3~\mathrm{s^{-1}}$) follow [Skogestad's SIMC rule](https://doi.org/10.1016/S0959-1524(02)00062-8) for the default process.
 
 **Process** ([`FirstOrderPlant`](src/main/java/org/ilu/remo/plant/FirstOrderPlant.java)). This is first order with dead time, with gain $K$, lag $T$ and dead time $L$. It is discretised exactly for a zero-order-hold input with step $\Delta t$:
@@ -176,13 +178,16 @@ Open **http://localhost:8080**. Then:
 Each service can run as its own process, for example on different machines:
 
 ```bash
-java -jar target/remo.jar actuator
-REMO_ACTUATOR_URL=http://field-box:8082/ java -jar target/remo.jar sensor
-REMO_SENSOR_URL=http://field-box:8081/ REMO_ACTUATOR_URL=http://field-box:8082/ java -jar target/remo.jar controller
+REMO_BIND_HOST=0.0.0.0 java -jar target/remo.jar actuator
+REMO_BIND_HOST=0.0.0.0 REMO_ACTUATOR_URL=http://field-box:8082/ java -jar target/remo.jar sensor
+REMO_BIND_HOST=0.0.0.0 REMO_SENSOR_URL=http://field-box:8081/ REMO_ACTUATOR_URL=http://field-box:8082/ java -jar target/remo.jar controller
 ```
+
+Services bind only to loopback by default. Setting `REMO_BIND_HOST=0.0.0.0` exposes their unauthenticated HTTP APIs, so use it only on a trusted network. Hosts must keep their clocks synchronized because actuator command deadlines use epoch time.
 
 | Variable                                                           | Default                    |
 | ------------------------------------------------------------------ | -------------------------- |
+| `REMO_BIND_HOST`                                                   | `127.0.0.1`                |
 | `REMO_CONTROLLER_PORT` / `REMO_SENSOR_PORT` / `REMO_ACTUATOR_PORT` | `8080` / `8081` / `8082`   |
 | `REMO_SENSOR_URL` / `REMO_ACTUATOR_URL`                            | `http://localhost:<port>/` |
 
@@ -196,8 +201,9 @@ REMO_SENSOR_URL=http://field-box:8081/ REMO_ACTUATOR_URL=http://field-box:8082/ 
 |                     | `GET`, `POST /api/sensor/faults` · `/api/actuator/faults` · `/api/plant` | Forwarded to the field services                                        |
 | Sensor              | `GET /reading`                                                           | `{ value, ageMillis }`, behind fault injection                         |
 |                     | `GET`, `POST /plant`                                                     | `{ gain, timeConstantSeconds, deadTimeSeconds }`                       |
-| Actuator            | `POST /command`                                                          | `{ value }`, behind fault injection; feeds the watchdog                |
-|                     | `GET /state`                                                             | `{ applied, watchdogTripped }`, the position the process actually sees |
+| Actuator            | `POST /command`                                                          | `{ value, sequence, expiresAtEpochMillis }`; ordered and time-bounded   |
+|                     | `GET /command`                                                           | Last acknowledgement, behind the controller-link fault injection       |
+|                     | `GET /state`                                                             | `{ applied, watchdogTripped, lastSequence }`, read by the process       |
 | Sensor and actuator | `GET`, `POST /faults`                                                    | `{ down, latencyMillis, dropRate }`                                    |
 
 ```bash
@@ -223,7 +229,7 @@ src/main/resources/web/             the dashboard: one HTML page, plain JS and C
 
 ## Tests
 
-`mvn verify` runs 25 tests in a few seconds:
+`mvn verify` runs 30 tests in a few seconds:
 
 - **[`PidControllerTest`](src/test/java/org/ilu/remo/control/PidControllerTest.java)** checks the PID itself:
   - gain arithmetic;
@@ -241,6 +247,9 @@ src/main/resources/web/             the dashboard: one HTML page, plain JS and C
   - bumpless recovery;
   - no windup while the actuator is lost;
   - manual mode.
+- **[`ActuatorServiceTest`](src/test/java/org/ilu/remo/actuator/ActuatorServiceTest.java)** proves expired and out-of-order commands cannot move the actuator.
+- **[`ActuatorLinkTest`](src/test/java/org/ilu/remo/controller/ActuatorLinkTest.java)** proves the controller reconciles a command that was applied when its acknowledgement was lost.
+- **[`HttpTest`](src/test/java/org/ilu/remo/http/HttpTest.java)** proves servers bind only to loopback by default.
 - **[`RemoEndToEndTest`](src/test/java/org/ilu/remo/RemoEndToEndTest.java)** starts all three services on real sockets. It closes the loop, cuts the sensor link through the API, checks the fail-safe and the recovery, and checks the event stream.
 
 ## From the 2014 thesis
@@ -282,7 +291,7 @@ The original code is preserved at the [`thesis-2014`](https://github.com/ioanluc
 ## Acknowledgements
 
 - Conf. Dr. Ing. **Eva Dulf**, who supervised the original thesis.
-- Brett Beauregard's [_Improving the Beginner's PID_](http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/) series, which shaped the 2014 PID. The rebuild keeps its best ideas: derivative on measurement, clamped integral and bumpless transfer.
+- Brett Beauregard's [_Improving the Beginner's PID_](http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/) series, which shaped the 2014 PID. The rebuild keeps its best ideas: derivative on measurement, anti-windup and bumpless transfer.
 - Sigurd Skogestad, [_Simple analytic rules for model reduction and PID controller tuning_](https://doi.org/10.1016/S0959-1524(02)00062-8) (2003), for the default tuning.
 
 ## Contributing

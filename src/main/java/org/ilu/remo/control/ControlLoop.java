@@ -26,7 +26,8 @@ public final class ControlLoop {
     }
 
     public interface Actuator {
-        void apply(double command) throws IOException;
+        /** Applies a command and returns the output acknowledged by the actuator. */
+        double apply(double command) throws IOException;
     }
 
     /** @param ageMillis how long ago the sensor measured this value, by the sensor's own clock */
@@ -113,9 +114,10 @@ public final class ControlLoop {
             }
         }
 
-        boolean actuatorOk = applyToActuator(command);
+        Double acknowledgedOutput = applyToActuator(command);
+        boolean actuatorOk = acknowledgedOutput != null;
         if (actuatorOk) {
-            appliedOutput = command;
+            appliedOutput = pid.limits().clamp(acknowledgedOutput);
         } else {
             needsInitialize = true;
             if (state == State.RUNNING) {
@@ -138,13 +140,16 @@ public final class ControlLoop {
         }
     }
 
-    private boolean applyToActuator(double command) {
+    private Double applyToActuator(double command) {
         try {
-            actuator.apply(command);
+            double acknowledged = actuator.apply(command);
+            if (!Double.isFinite(acknowledged)) {
+                throw new IOException("Actuator acknowledged a non-finite output: " + acknowledged);
+            }
 
-            return true;
+            return acknowledged;
         } catch (IOException ex) {
-            return false;
+            return null;
         }
     }
 
@@ -178,7 +183,10 @@ public final class ControlLoop {
     }
 
     public synchronized void setGains(PidController.Gains gains) {
-        pid.setGains(gains);
+        if (!gains.equals(pid.gains())) {
+            pid.setGains(gains);
+            needsInitialize = true;
+        }
     }
 
     public synchronized PidController.Direction direction() {
