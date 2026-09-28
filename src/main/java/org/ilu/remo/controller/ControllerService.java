@@ -2,7 +2,6 @@ package org.ilu.remo.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
-import org.ilu.remo.actuator.ActuatorService;
 import org.ilu.remo.control.ControlLoop;
 import org.ilu.remo.control.PidController;
 import org.ilu.remo.http.Http;
@@ -33,10 +32,20 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ControllerService implements AutoCloseable {
 
-    public record Config(int port, URI sensorUri, URI actuatorUri, Duration sampleTime, double initialSetpoint,
-                         PidController.Gains gains, PidController.OutputLimits limits, ControlLoop.Settings loop) {
+    public record Config(String bindHost, int port, URI sensorUri, URI actuatorUri, Duration sampleTime,
+                         double initialSetpoint, PidController.Gains gains, PidController.OutputLimits limits,
+                         ControlLoop.Settings loop) {
+        public Config(int port, URI sensorUri, URI actuatorUri, Duration sampleTime, double initialSetpoint,
+                      PidController.Gains gains, PidController.OutputLimits limits, ControlLoop.Settings loop) {
+            this("127.0.0.1", port, sensorUri, actuatorUri, sampleTime, initialSetpoint, gains, limits, loop);
+        }
+
         public static Config defaults(int port, URI sensorUri, URI actuatorUri) {
-            return new Config(port, sensorUri, actuatorUri, Duration.ofMillis(100), 60,
+            return defaults("127.0.0.1", port, sensorUri, actuatorUri);
+        }
+
+        public static Config defaults(String bindHost, int port, URI sensorUri, URI actuatorUri) {
+            return new Config(bindHost, port, sensorUri, actuatorUri, Duration.ofMillis(100), 60,
                 new PidController.Gains(2.5, 0.3, 0),
                 new PidController.OutputLimits(0, 100),
                 new ControlLoop.Settings(Duration.ofMillis(500), Duration.ofSeconds(3), 0));
@@ -76,7 +85,7 @@ public final class ControllerService implements AutoCloseable {
         // Both remote calls must fit in one sample period; a slower answer counts as a lost link.
         Duration callTimeout = config.sampleTime().multipliedBy(2).dividedBy(5);
         Http.Client sensor = new Http.Client(config.sensorUri(), callTimeout);
-        Http.Client actuator = new Http.Client(config.actuatorUri(), callTimeout);
+        ActuatorLink actuator = new ActuatorLink(config.actuatorUri(), callTimeout);
 
         this.loop = new ControlLoop(
             new PidController(config.gains(), PidController.Direction.DIRECT, config.limits()),
@@ -84,7 +93,7 @@ public final class ControllerService implements AutoCloseable {
                 SensorService.Reading reading = sensor.get("/reading", SensorService.Reading.class);
                 return new ControlLoop.Reading(reading.value(), reading.ageMillis());
             },
-            command -> actuator.post("/command", new ActuatorService.Command(command), ActuatorService.State.class),
+            actuator,
             config.loop(),
             System::nanoTime);
         loop.setSetpoint(config.initialSetpoint());
@@ -92,7 +101,7 @@ public final class ControllerService implements AutoCloseable {
         Http.Client sensorAdmin = new Http.Client(config.sensorUri(), Duration.ofSeconds(1));
         Http.Client actuatorAdmin = new Http.Client(config.actuatorUri(), Duration.ofSeconds(1));
 
-        this.server = Http.start(config.port(), Map.of(
+        this.server = Http.start(config.bindHost(), config.port(), Map.of(
             "/", Http.resource("/web/index.html", "text/html; charset=utf-8"),
             "/app.js", Http.resource("/web/app.js", "text/javascript; charset=utf-8"),
             "/style.css", Http.resource("/web/style.css", "text/css; charset=utf-8"),

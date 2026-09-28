@@ -28,9 +28,19 @@ import java.util.concurrent.TimeUnit;
  */
 public final class SensorService implements AutoCloseable {
 
-    public record Config(int port, URI actuatorUri, Duration plantStep, FirstOrderPlant.Parameters plant) {
+    public record Config(String bindHost, int port, URI actuatorUri, Duration plantStep,
+                         FirstOrderPlant.Parameters plant) {
+        public Config(int port, URI actuatorUri, Duration plantStep, FirstOrderPlant.Parameters plant) {
+            this("127.0.0.1", port, actuatorUri, plantStep, plant);
+        }
+
         public static Config defaults(int port, URI actuatorUri) {
-            return new Config(port, actuatorUri, Duration.ofMillis(20), new FirstOrderPlant.Parameters(1.5, 8, 1));
+            return defaults("127.0.0.1", port, actuatorUri);
+        }
+
+        public static Config defaults(String bindHost, int port, URI actuatorUri) {
+            return new Config(bindHost, port, actuatorUri, Duration.ofMillis(20),
+                new FirstOrderPlant.Parameters(1.5, 8, 1));
         }
     }
 
@@ -60,7 +70,7 @@ public final class SensorService implements AutoCloseable {
         scheduler.scheduleAtFixedRate(this::stepPlant, 0, stepMillis, TimeUnit.MILLISECONDS);
         scheduler.scheduleWithFixedDelay(this::readValvePosition, 0, Math.max(stepMillis, 50), TimeUnit.MILLISECONDS);
 
-        this.server = Http.start(config.port(), Map.of(
+        this.server = Http.start(config.bindHost(), config.port(), Map.of(
             "/reading", Http.get(faults.wrap(exchange -> reading())),
             "/plant", Http.methods(Map.of(
                 "GET", exchange -> parameters(),

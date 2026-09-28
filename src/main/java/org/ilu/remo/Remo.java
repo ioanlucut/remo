@@ -19,9 +19,9 @@ import java.util.concurrent.CountDownLatch;
  *   java -jar remo.jar actuator
  * </pre>
  *
- * <p>Ports and addresses come from environment variables: {@code REMO_CONTROLLER_PORT} (8080),
- * {@code REMO_SENSOR_PORT} (8081), {@code REMO_ACTUATOR_PORT} (8082), {@code REMO_SENSOR_URL} and
- * {@code REMO_ACTUATOR_URL} (localhost on those ports).
+ * <p>Ports and addresses come from environment variables: {@code REMO_BIND_HOST} (127.0.0.1),
+ * {@code REMO_CONTROLLER_PORT} (8080), {@code REMO_SENSOR_PORT} (8081), {@code REMO_ACTUATOR_PORT} (8082),
+ * {@code REMO_SENSOR_URL} and {@code REMO_ACTUATOR_URL} (localhost on those ports).
  */
 public final class Remo {
 
@@ -30,6 +30,7 @@ public final class Remo {
 
     public static void main(String[] args) throws InterruptedException {
         String role = args.length > 0 ? args[0] : "all";
+        String bindHost = env("REMO_BIND_HOST", "127.0.0.1");
         int controllerPort = intEnv("REMO_CONTROLLER_PORT", 8080);
         int sensorPort = intEnv("REMO_SENSOR_PORT", 8081);
         int actuatorPort = intEnv("REMO_ACTUATOR_PORT", 8082);
@@ -38,15 +39,16 @@ public final class Remo {
 
         List<AutoCloseable> services = new ArrayList<>();
         if (role.equals("all") || role.equals("actuator")) {
-            services.add(new ActuatorService(ActuatorService.Config.defaults(actuatorPort)));
+            services.add(new ActuatorService(ActuatorService.Config.defaults(bindHost, actuatorPort)));
             System.out.println("Actuator   http://localhost:" + actuatorPort + "/state");
         }
         if (role.equals("all") || role.equals("sensor")) {
-            services.add(new SensorService(SensorService.Config.defaults(sensorPort, actuatorUri)));
+            services.add(new SensorService(SensorService.Config.defaults(bindHost, sensorPort, actuatorUri)));
             System.out.println("Sensor     http://localhost:" + sensorPort + "/reading");
         }
         if (role.equals("all") || role.equals("controller")) {
-            services.add(new ControllerService(ControllerService.Config.defaults(controllerPort, sensorUri, actuatorUri)));
+            services.add(new ControllerService(
+                ControllerService.Config.defaults(bindHost, controllerPort, sensorUri, actuatorUri)));
             System.out.println("Controller http://localhost:" + controllerPort + "/");
         }
         if (services.isEmpty()) {

@@ -41,6 +41,7 @@ class ControlLoopTest {
                 throw new IOException("actuator down");
             }
             applied = command;
+            return applied;
         };
         loop = new ControlLoop(
             new PidController(new Gains(2.5, 0.3, 0), Direction.DIRECT, new OutputLimits(0, 100)),
@@ -108,19 +109,21 @@ class ControlLoopTest {
     }
 
     @Test
-    void doesNotWindUpWhileTheActuatorIsUnreachable() {
+    void doesNotWindUpOrJumpWhenTheActuatorReturns() {
         runSeconds(120);
         double settledOutput = applied;
         loop.setSetpoint(120);
 
         actuatorUp = false;
-        Sample sample = runSeconds(30);
+        Sample unavailable = runSeconds(30);
         actuatorUp = true;
-        tick();
+        Sample recovered = tick();
+        Sample resumed = tick();
 
-        assertThat(sample.state()).isEqualTo(State.HOLDING);
-        assertThat(sample.actuatorOk()).isFalse();
-        assertThat(applied).isEqualTo(settledOutput);
+        assertThat(unavailable.state()).isEqualTo(State.HOLDING);
+        assertThat(unavailable.actuatorOk()).isFalse();
+        assertThat(recovered.output()).isEqualTo(settledOutput);
+        assertThat(resumed.output()).isBetween(settledOutput, settledOutput + 5);
     }
 
     @Test
