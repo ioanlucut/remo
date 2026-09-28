@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remo · Remote PID control</title>
+  <meta name="description" content="A PID loop closed over a remote sensor and a remote actuator, on a network that can fail.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%2338bdf8' stroke-width='4' stroke-dasharray='56 20'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2338bdf8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="3.5" stroke-dasharray="56 20" stroke-linecap="round"/>
+        <circle cx="16" cy="16" r="4" fill="currentColor"/>
+      </svg>
+      <div>
+        <h1 class="brand__name">Remo</h1>
+        <p class="brand__tagline">Remote PID control over an unreliable network</p>
+      </div>
+    </div>
+    <div class="topbar__status">
+      <span class="pill" id="stream-pill" data-tone="muted"><span class="pill__dot"></span><span id="stream-label">Connecting…</span></span>
+      <span class="state-badge" id="state-badge" data-state="RUNNING">—</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card card--diagram" aria-labelledby="diagram-title">
+      <div class="card__head">
+        <h2 id="diagram-title">How the loop works</h2>
+        <p class="card__hint">Every packet is a real request. Click a network link to cut it.</p>
+      </div>
+
+      <div class="diagram-wrap">
+        <svg class="diagram" id="diagram" viewBox="0 0 900 380" role="img"
+             aria-label="Control loop: the controller reads the remote sensor, computes a command and sends it to the remote actuator, which drives the process that the sensor measures.">
+          <defs>
+            <linearGradient id="water-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" class="water-top"/>
+              <stop offset="1" class="water-bottom"/>
+            </linearGradient>
+            <clipPath id="tank-clip">
+              <rect x="705" y="115" width="130" height="150" rx="14"/>
+            </clipPath>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- Zones -->
+          <rect class="zone zone--network" x="310" y="14" width="150" height="352" rx="18"/>
+          <text class="zone-label" x="385" y="40" text-anchor="middle">NETWORK</text>
+          <text class="zone-sublabel" x="385" y="56" text-anchor="middle">may be slow or down</text>
+          <text class="zone-label" x="172" y="40" text-anchor="middle">CONTROL ROOM</text>
+          <text class="zone-label" x="680" y="40" text-anchor="middle">FIELD</text>
+
+          <!-- Links: network (clickable) and physical -->
+          <g class="link link--network" id="link-command" data-service="actuator" tabindex="0" role="button"
+             aria-label="Command link to the actuator. Activate to cut or restore it.">
+            <path class="link__hit" d="M 285 150 C 380 150, 380 80, 480 80"/>
+            <path class="link__line" id="path-command" d="M 285 150 C 380 150, 380 80, 480 80"/>
+            <g class="link__cut"><circle cx="385" cy="110" r="13"/><path d="M 379 104 L 391 116 M 391 104 L 379 116"/></g>
+          </g>
+          <g class="link link--network" id="link-reading" data-service="sensor" tabindex="0" role="button"
+             aria-label="Reading link from the sensor. Activate to cut or restore it.">
+            <path class="link__hit" d="M 480 300 C 380 300, 380 230, 285 230"/>
+            <path class="link__line" id="path-reading" d="M 480 300 C 380 300, 380 230, 285 230"/>
+            <g class="link__cut"><circle cx="385" cy="266" r="13"/><path d="M 379 260 L 391 272 M 391 260 L 379 272"/></g>
+          </g>
+          <path class="link link--physical" id="flow-valve" d="M 640 80 C 700 80, 740 80, 740 112"/>
+          <path class="link link--physical" id="flow-probe" d="M 770 268 C 770 300, 700 300, 640 300"/>
+
+          <g id="packets"></g>
+
+          <!-- Controller -->
+          <g class="node" id="node-controller">
+            <rect class="node__box" x="55" y="95" width="230" height="190" rx="18"/>
+            <text class="node__title" x="75" y="124">Controller</text>
+            <text class="node__meta" x="265" y="124" text-anchor="end">PID</text>
+            <text class="node__label" x="75" y="158">Setpoint</text>
+            <text class="node__value node__value--sp" id="d-sp" x="265" y="158" text-anchor="end">—</text>
+            <text class="node__label" x="75" y="186">Process value</text>
+            <text class="node__value node__value--pv" id="d-pv" x="265" y="186" text-anchor="end">—</text>
+            <text class="node__label" x="75" y="214">Output</text>
+            <text class="node__value node__value--out" id="d-out" x="265" y="214" text-anchor="end">—</text>
+            <line class="node__rule" x1="75" y1="232" x2="265" y2="232"/>
+            <text class="node__formula" x="170" y="260" text-anchor="middle">u = Kp·e + Ki∫e dt − Kd·dPV/dt</text>
+          </g>
+
+          <!-- Actuator: valve gauge -->
+          <g class="node" id="node-actuator">
+            <rect class="node__box" x="480" y="35" width="160" height="90" rx="16"/>
+            <text class="node__title" x="496" y="62">Actuator</text>
+            <text class="node__meta" x="496" y="84">valve</text>
+            <text class="node__value node__value--out" id="d-valve" x="496" y="110">—</text>
+            <path class="gauge__track" d="M 572 102 A 30 30 0 0 1 632 102"/>
+            <path class="gauge__fill" id="gauge-fill" d="M 572 102 A 30 30 0 0 1 632 102" pathLength="100"/>
+            <line class="gauge__needle" id="gauge-needle" x1="602" y1="102" x2="602" y2="78"/>
+            <circle class="gauge__hub" cx="602" cy="102" r="4"/>
+          </g>
+
+          <!-- Plant: tank -->
+          <g class="node" id="node-plant">
+            <text class="node__title" x="835" y="100" text-anchor="end">Process</text>
+            <g clip-path="url(#tank-clip)">
+              <rect class="tank__bg" x="705" y="115" width="130" height="150"/>
+              <g id="water" class="water">
+                <path class="water__wave" fill="url(#water-gradient)"
+                      d="M 640 0 Q 660 -6 680 0 T 720 0 T 760 0 T 800 0 T 840 0 T 880 0 T 920 0 V 200 H 640 Z"/>
+              </g>
+              <line class="tank__sp" id="tank-sp" x1="705" x2="835" y1="200" y2="200"/>
+            </g>
+            <rect class="tank__frame" x="705" y="115" width="130" height="150" rx="14"/>
+            <text class="tank__value" id="d-tank" x="770" y="196" text-anchor="middle">—</text>
+          </g>
+
+          <!-- Sensor -->
+          <g class="node" id="node-sensor">
+            <rect class="node__box" x="480" y="255" width="160" height="90" rx="16"/>
+            <text class="node__title" x="496" y="282">Sensor</text>
+            <text class="node__meta" x="496" y="304">process value</text>
+            <text class="node__value node__value--pv" id="d-sensor" x="496" y="330">—</text>
+            <g class="sensor__signal" id="sensor-signal">
+              <path d="M 600 318 a 10 10 0 0 1 14 0"/>
+              <path d="M 594 312 a 18 18 0 0 1 26 0"/>
+              <circle cx="607" cy="324" r="3"/>
+            </g>
+          </g>
+
+          <!-- Step markers -->
+          <g class="steps" aria-hidden="true">
+            <g class="step" transform="translate(410 300)"><circle r="11"/><text dy="4">1</text></g>
+            <g class="step" transform="translate(170 300)"><circle r="11"/><text dy="4">2</text></g>
+            <g class="step" transform="translate(410 80)"><circle r="11"/><text dy="4">3</text></g>
+            <g class="step" transform="translate(850 190)"><circle r="11"/><text dy="4">4</text></g>
+          </g>
+
+          <g class="callout" id="callout" aria-live="polite">
+            <rect x="120" y="322" width="300" height="40" rx="12"/>
+            <text id="callout-text" x="270" y="347" text-anchor="middle"></text>
+          </g>
+        </svg>
+      </div>
+
+      <ol class="legend">
+        <li><b>Read.</b> The controller asks the remote sensor for the process value, with a timeout shorter than one sample.</li>
+        <li><b>Compute.</b> The PID turns the error into an output. Gains are per second, so tuning survives a change of sample rate.</li>
+        <li><b>Actuate.</b> The output goes to the remote actuator, whose watchdog closes the valve if commands stop.</li>
+        <li><b>Respond.</b> The process follows the valve with a gain, a lag and a dead time, and the sensor measures it.</li>
+      </ol>
+    </section>
+
+    <section class="card card--chart" aria-labelledby="chart-title">
+      <div class="card__head">
+        <h2 id="chart-title">Last 60 seconds</h2>
+        <ul class="chart-key">
+          <li class="chart-key__sp">Setpoint</li>
+          <li class="chart-key__pv">Process value</li>
+          <li class="chart-key__out">Output %</li>
+          <li class="chart-key__hold">Holding</li>
+          <li class="chart-key__safe">Fail-safe</li>
+        </ul>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart" aria-label="Chart of setpoint, process value and output over the last 60 seconds"></canvas>
+      </div>
+      <dl class="readouts">
+        <div><dt>Error</dt><dd id="r-error">—</dd></div>
+        <div><dt>Sensor link</dt><dd id="r-sensor">—</dd></div>
+        <div><dt>Actuator link</dt><dd id="r-actuator">—</dd></div>
+        <div><dt>Sample</dt><dd id="r-sample">—</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" aria-labelledby="control-title">
+      <div class="card__head"><h2 id="control-title">Control</h2></div>
+
+      <label class="field field--wide">
+        <span class="field__label">Setpoint <output id="sp-out" class="field__value">—</output></span>
+        <input type="range" id="setpoint" min="0" max="150" step="1">
+      </label>
+
+      <div class="segmented" role="radiogroup" aria-label="Mode">
+        <button type="button" role="radio" data-mode="auto" aria-checked="true">Auto</button>
+        <button type="button" role="radio" data-mode="manual" aria-checked="false">Manual</button>
+      </div>
+
+      <label class="field field--wide" id="manual-field">
+        <span class="field__label">Manual output <output id="manual-out" class="field__value">—</output></span>
+        <input type="range" id="manual-output" min="0" max="100" step="1">
+      </label>
+
+      <div class="field-row">
+        <label class="field"><span class="field__label">Kp</span><input type="number" id="kp" min="0" step="0.1"></label>
+        <label class="field"><span class="field__label">Ki <small>/s</small></span><input type="number" id="ki" min="0" step="0.05"></label>
+        <label class="field"><span class="field__label">Kd <small>s</small></span><input type="number" id="kd" min="0" step="0.1"></label>
+      </div>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field__label">Direction</span>
+          <select id="direction">
+            <option value="DIRECT">Direct</option>
+            <option value="REVERSE">Reverse</option>
+          </select>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="demo">
+          <span class="switch__track"><span class="switch__thumb"></span></span>
+          <span>Demo: new setpoint every 20 s</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="faults-title">
+      <div class="card__head">
+        <h2 id="faults-title">Network faults</h2>
+        <p class="card__hint">Each call times out after <span id="timeout-hint">40</span> ms.</p>
+      </div>
+      <div class="fault-grid" id="fault-grid"></div>
+    </section>
+
+    <section class="card" aria-labelledby="plant-title">
+      <div class="card__head">
+        <h2 id="plant-title">Process</h2>
+        <p class="card__hint">G(s) = K·e<sup>−Ls</sup> / (Ts + 1)</p>
+      </div>
+      <div class="field-row">
+        <label class="field"><span class="field__label">Gain K</span><input type="number" id="gain" step="0.1"></label>
+        <label class="field"><span class="field__label">Lag T <small>s</small></span><input type="number" id="time-constant" min="0.1" step="0.5"></label>
+        <label class="field"><span class="field__label">Dead time L <small>s</small></span><input type="number" id="dead-time" min="0" step="0.5"></label>
+      </div>
+      <div class="try">
+        <h3 class="try__title">Try this</h3>
+        <ul class="try__list">
+          <li><b>Cut the sensor link.</b> The controller holds its output, then goes fail-safe after 3 s, and resumes without a bump.</li>
+          <li><b>Cut the actuator link.</b> The integrator freezes, and the actuator's own watchdog closes the valve after 1 s.</li>
+          <li><b>Add 60 ms latency.</b> Answers now arrive after the 40 ms timeout, so a slow link counts as a lost one.</li>
+          <li><b>Raise the dead time to 4 s.</b> The same gains now oscillate. Retune to Kp 1 and Ki 0.1 to settle it.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Revived from a 2014 master's thesis. Java 21, the JDK's own HTTP server, and no framework.
+    <a href="https://github.com/ioanlucut/remo">Source</a>
+  </footer>
+
+  <template id="fault-template">
+    <fieldset class="fault">
+      <legend class="fault__title"></legend>
+      <label class="switch">
+        <input type="checkbox" data-fault="down">
+        <span class="switch__track"><span class="switch__thumb"></span></span>
+        <span>Link down</span>
+      </label>
+      <label class="field field--wide">
+        <span class="field__label">Latency <output class="field__value" data-out="latencyMillis">0 ms</output></span>
+        <input type="range" data-fault="latencyMillis" min="0" max="200" step="5">
+      </label>
+      <label class="field field--wide">
+        <span class="field__label">Dropped requests <output class="field__value" data-out="dropRate">0%</output></span>
+        <input type="range" data-fault="dropRate" min="0" max="100" step="5">
+      </label>
+    </fieldset>
+  </template>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
