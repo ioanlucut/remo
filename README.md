@@ -139,20 +139,20 @@ stateDiagram-v2
 
 **PID controller** ([`PidController`](src/main/java/org/ilu/remo/control/PidController.java)). This is the positional form. $\sigma = +1$ for direct acting and $-1$ for reverse acting (e.g. cooling). $\Delta t_k$ is the measured time since the previous step:
 
-$$e_k = \sigma\,(SP - PV_k)$$
+$$e_k = \sigma (SP - PV_k)$$
 
-$$I_k = \mathrm{clamp}\big(I_{k-1} + K_i\,e_k\,\Delta t_k\big)$$
+$$I_k = \mathrm{clamp}\big(I_{k-1} + K_i e_k \Delta t_k\big)$$
 
-$$u_k = \mathrm{clamp}\Big(K_p\,e_k + I_k - \sigma\,K_d\,\frac{PV_k - PV_{k-1}}{\Delta t_k}\Big)$$
+$$u_k = \mathrm{clamp}\Big(K_p e_k + I_k - \sigma K_d \frac{PV_k - PV_{k-1}}{\Delta t_k}\Big)$$
 
 - A bumpless transfer sets $I := u$ and $PV_{k-1} := PV_k$, so the next step continues from the current output.
-- The defaults ($K_p = 2.5$, $K_i = 0.3\,\mathrm{s^{-1}}$) follow [Skogestad's SIMC rule](https://doi.org/10.1016/S0959-1524(02)00062-8) for the default process.
+- The defaults ($K_p = 2.5$, $K_i = 0.3~\mathrm{s^{-1}}$) follow [Skogestad's SIMC rule](https://doi.org/10.1016/S0959-1524(02)00062-8) for the default process.
 
 **Process** ([`FirstOrderPlant`](src/main/java/org/ilu/remo/plant/FirstOrderPlant.java)). This is first order with dead time, with gain $K$, lag $T$ and dead time $L$. It is discretised exactly for a zero-order-hold input with step $\Delta t$:
 
-$$G(s) = \frac{K\,e^{-Ls}}{Ts + 1} \qquad\Longrightarrow\qquad y_{k+1} = a\,y_k + K(1-a)\,u_{k-d},\quad a = e^{-\Delta t/T},\; d = \mathrm{round}(L/\Delta t)$$
+$$G(s) = \frac{K e^{-Ls}}{Ts + 1} \qquad\Longrightarrow\qquad y_{k+1} = a y_k + K(1-a) u_{k-d},\quad a = e^{-\Delta t/T},\quad d = \mathrm{round}(L/\Delta t)$$
 
-The defaults are $K = 1.5$, $T = 8\,\mathrm{s}$ and $L = 1\,\mathrm{s}$: a slow process with a noticeable delay, like a heated tank.
+The defaults are $K = 1.5$, $T = 8~\mathrm{s}$ and $L = 1~\mathrm{s}$: a slow process with a noticeable delay, like a heated tank.
 
 ## Quick start
 
